@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CVC Cafe - สั่งเครื่องดื่ม</title>
+    <style>
+        /* สไตล์เดิม... (ผมละไว้เพื่อความกระชับ แต่คุณก๊อปปี้ไปวางเต็มๆ ได้เลยครับ) */
+        body { font-family: 'Kanit', sans-serif; background-color: #f7f9fc; padding: 20px; max-width: 500px; margin: auto; padding-bottom: 80px; }
+        .menu-card { background: white; padding: 15px; margin-bottom: 15px; border-radius: 10px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        h3 { margin: 0 0 10px 0; color: #333; }
+        .price-tag { color: #555; font-size: 14px; margin-bottom: 10px; }
+        button.select-btn { background-color: #00B900; color: white; border: none; padding: 8px 15px; border-radius: 5px; cursor: pointer; width: 100%; font-size: 16px; }
+        
+        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); justify-content: center; align-items: center; z-index: 1000; }
+        .modal-content { background: white; padding: 20px; border-radius: 10px; width: 90%; max-width: 400px; max-height: 80vh; overflow-y: auto; text-align: center; } /* เพิ่ม text-align: center สำหรับหน้าจ่ายเงิน */
+        .option-group { margin-bottom: 15px; text-align: left;} /* จัดซ้ายให้แบบฟอร์ม */
+        .option-group label { display: block; margin-bottom: 5px; cursor: pointer; }
+        .btn-group { display: flex; gap: 10px; margin-top: 20px; }
+        .btn-group button { flex: 1; padding: 10px; border-radius: 5px; border: none; cursor: pointer; font-size: 16px; }
+        .btn-cancel { background-color: #ccc; }
+        .btn-add { background-color: #00B900; color: white; }
+
+        #cart-summary { background: #f9f9f9; padding: 10px; border-radius: 5px; margin-bottom: 15px; font-size: 14px; text-align: left; }
+        input[type="text"], input[type="file"] { width: 100%; padding: 10px; margin-top: 5px; border: 1px solid #ccc; border-radius: 5px; box-sizing: border-box; font-size: 16px; font-family: 'Kanit', sans-serif;}
+
+        .cart-bar { position: fixed; bottom: 0; left: 0; width: 100%; background: #fff; box-shadow: 0 -2px 10px rgba(0,0,0,0.1); padding: 15px 20px; display: flex; justify-content: space-between; align-items: center; box-sizing: border-box; display: none; z-index: 900;}
+        .cart-bar .cart-info { font-size: 16px; font-weight: bold; color: #333; }
+        .cart-bar button { background-color: #00B900; color: white; border: none; padding: 10px 20px; border-radius: 5px; font-size: 16px; cursor: pointer; }
+
+        /* สไตล์หน้าชำระเงิน */
+        #payment-qr { max-width: 200px; margin: 15px auto; display: block; }
+        .total-pay { font-size: 24px; font-weight: bold; color: #e74c3c; margin: 10px 0; }
+    </style>
+</head>
+<body>
+
+    <h2 style="text-align: center;">☕ CVC Cafe</h2>
+    <div id="loading" style="text-align: center;">กำลังโหลดเมนู...</div>
+    <div id="menu-container"></div>
+
+    <div id="orderModal" class="modal">
+        <div class="modal-content">
+            <h3 id="modal-menu-name" style="text-align: left;">ชื่อเมนู</h3>
+            
+            <div class="option-group" id="type-options"></div>
+
+            <div class="option-group">
+                <p><strong>ระดับความหวาน:</strong></p>
+                <label><input type="radio" name="sweetness" value="หวานปกติ (100%)" checked> หวานปกติ (100%)</label>
+                <label><input type="radio" name="sweetness" value="หวานน้อย (50%)"> หวานน้อย (50%)</label>
+                <label><input type="radio" name="sweetness" value="หวานน้อยมาก (25%)"> หวานน้อยมาก (25%)</label>
+                <label><input type="radio" name="sweetness" value="ไม่หวานเลย (0%)"> ไม่หวานเลย (0%)</label>
+            </div>
+
+            <div class="btn-group">
+                <button class="btn-cancel" onclick="closeModal()">ยกเลิก</button>
+                <button class="btn-add" onclick="addToCart()">เพิ่มลงตะกร้า</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="checkoutModal" class="modal">
+        <div class="modal-content">
+            <h3 style="text-align: left;">สรุปรายการสั่งซื้อ</h3>
+            <div id="cart-summary"></div>
+            
+            <div class="option-group">
+                <label><strong>ชื่อผู้สั่ง (หรือชื่อเล่น):</strong></label>
+                <input type="text" id="customer-name" placeholder="ระบุชื่อเพื่อเรียกคิว..." required>
+            </div>
+
+            <div class="btn-group">
+                <button class="btn-cancel" onclick="closeCheckoutModal()">แก้ไขรายการ</button>
+                <button class="btn-add" onclick="openPaymentModal()">ดำเนินการชำระเงิน</button> 
+            </div>
+        </div>
+    </div>
+
+    <div id="paymentModal" class="modal">
+        <div class="modal-content">
+            <h3>สแกนชำระเงิน</h3>
+            <p>กรุณาสแกน QR Code ด้านล่างเพื่อโอนเงิน</p>
+            
+            
+
+[Image of QR code]
+
+            <img id="payment-qr" src="https://i.postimg.cc/g21gX0qk/6a4b4d43-b875-4651-872a-116d0d3efdfc.jpg" alt="QR Code รับเงินร้าน CVC Cafe"> 
+            
+            <div class="total-pay">ยอดชำระ: <span id="pay-amount">0</span> บาท</div>
+
+            <div class="option-group">
+                <label><strong>แนบสลิปโอนเงิน (ถ้ามี):</strong></label>
+                <input type="file" id="slip-upload" accept="image/*">
+                <small style="color: gray;">(ถ้าจ่ายเงินสด ให้ข้ามการแนบสลิปแล้วกดยืนยันได้เลย)</small>
+            </div>
+
+            <div class="btn-group">
+                <button class="btn-cancel" onclick="closePaymentModal()">กลับไปแก้ไข</button>
+                <button class="btn-add" id="btn-confirm-pay" onclick="confirmOrder()">ยืนยันการสั่งซื้อ</button> 
+            </div>
+        </div>
+    </div>
+
+    <div id="cartBar" class="cart-bar">
+        <div class="cart-info">ตะกร้า: <span id="cart-count">0</span> แก้ว | <span id="cart-total">0</span>฿</div>
+        <button onclick="checkout()">ดูตะกร้า / สั่งซื้อ</button>
+    </div>
+
+    <script>
+        // 🔴 อย่าลืม! วางลิงก์ URL ที่ได้จาก Apps Script ของคุณที่นี่ 🔴
+        const API_URL = "https://script.google.com/macros/s/AKfycbyxSGf5JObtabaAtmhK94SXoqJIW0FoDQ5K_SNkRUqPbO3pJqNNKrM5NRBZ62z6vp_T/exec";
+        let menuData = []; 
+        let currentItem = null; 
+        let cart = []; 
+
+        // ... (ฟังก์ชัน fetch, renderMenu, openModal, closeModal, addToCart, updateCartUI เหมือนเดิม) ...
+        fetch(API_URL)
+            .then(response => response.json())
+            .then(data => {
+                document.getElementById('loading').style.display = 'none';
+                menuData = data;
+                renderMenu();
+            })
+            .catch(error => console.error('Error:', error));
+
+        function renderMenu() {
+            let html = "";
+            menuData.forEach(item => {
+                let priceText = `ร้อน: ${item.priceHot || '-'} | เย็น: ${item.priceIce || '-'} | ปั่น: ${item.priceFrappe || '-'}`;
+                html += `
+                <div class="menu-card">
+                    <h3>${item.name} <span style="font-size: 12px; color: gray;">(${item.category})</span></h3>
+                    <div class="price-tag">${priceText}</div>
+                    <button class="select-btn" onclick="openModal('${item.id}')">เลือกเครื่องดื่มนี้</button>
+                </div>`;
+            });
+            document.getElementById('menu-container').innerHTML = html;
+        }
+
+        function openModal(id) {
+            currentItem = menuData.find(m => m.id === id);
+            document.getElementById('modal-menu-name').innerText = currentItem.name;
+            let typeHtml = "<p><strong>ประเภท:</strong></p>";
+            if(currentItem.priceHot) typeHtml += `<label><input type="radio" name="drinkType" value="ร้อน" data-price="${currentItem.priceHot}" checked> ร้อน (${currentItem.priceHot}฿)</label>`;
+            if(currentItem.priceIce) typeHtml += `<label><input type="radio" name="drinkType" value="เย็น" data-price="${currentItem.priceIce}" ${!currentItem.priceHot ? 'checked' : ''}> เย็น (${currentItem.priceIce}฿)</label>`;
+            if(currentItem.priceFrappe) typeHtml += `<label><input type="radio" name="drinkType" value="ปั่น" data-price="${currentItem.priceFrappe}"> ปั่น (${currentItem.priceFrappe}฿)</label>`;
+            document.getElementById('type-options').innerHTML = typeHtml;
+            document.getElementById('orderModal').style.display = 'flex';
+        }
+
+        function closeModal() { document.getElementById('orderModal').style.display = 'none'; }
+
+        function addToCart() {
+            const selectedType = document.querySelector('input[name="drinkType"]:checked');
+            const selectedSweetness = document.querySelector('input[name="sweetness"]:checked').value;
+            if(!selectedType) { alert("กรุณาเลือกประเภท"); return; }
+            cart.push({ id: currentItem.id, name: currentItem.name, type: selectedType.value, sweetness: selectedSweetness, price: parseInt(selectedType.getAttribute('data-price')) });
+            closeModal();
+            updateCartUI();
+        }
+
+        function updateCartUI() {
+            if(cart.length > 0) {
+                document.getElementById('cartBar').style.display = 'flex'; 
+                document.getElementById('cart-count').innerText = cart.length;
+                document.getElementById('cart-total').innerText = cart.reduce((sum, item) => sum + item.price, 0);
+            } else {
+                document.getElementById('cartBar').style.display = 'none';
+            }
+        }
+
+        function checkout() {
+            if(cart.length === 0) return;
+            let summaryHtml = "";
+            cart.forEach(item => { summaryHtml += `<div style="margin-bottom: 5px;">- ${item.name} ${item.type} <small style="color:gray;">(${item.sweetness})</small> : ${item.price}฿</div>`; });
+            const totalPrice = cart.reduce((sum, item) => sum + item.price, 0);
+            summaryHtml += `<hr><strong>ยอดรวมทั้งหมด: ${totalPrice} บาท</strong>`;
+            document.getElementById('cart-summary').innerHTML = summaryHtml;
+            document.getElementById('checkoutModal').style.display = 'flex';
+        }
+
+        function closeCheckoutModal() { document.getElementById('checkoutModal').style.display = 'none'; }
+
+        // 🌟 ฟังก์ชันเปิดหน้าชำระเงิน (ใหม่) 🌟
+        function openPaymentModal() {
+            const customerName = document.getElementById('customer-name').value;
+            if(!customerName) {
+                alert("กรุณาพิมพ์ชื่อผู้สั่งด้วยครับ เพื่อให้บาริสต้าเรียกคิวถูก");
+                return;
+            }
+            
+            // ปิดหน้าสรุปบิล แล้วเปิดหน้าชำระเงิน
+            closeCheckoutModal();
+            const totalPrice = cart.reduce((sum, item) => sum + item.price, 0);
+            document.getElementById('pay-amount').innerText = totalPrice;
+            document.getElementById('paymentModal').style.display = 'flex';
+        }
+
+        function closePaymentModal() {
+            document.getElementById('paymentModal').style.display = 'none';
+            document.getElementById('checkoutModal').style.display = 'flex'; // กลับไปหน้าสรุปบิล
+        }
+
+        function confirmOrder() {
+            const customerName = document.getElementById('customer-name').value;
+            const btn = document.getElementById('btn-confirm-pay');
+            
+            // เช็คว่าแนบสลิปไหม (เป็นแค่ลูกเล่น โค้ดจริงจะซับซ้อนกว่านี้ถ้ารับไฟล์ภาพเข้า Google Drive)
+            const slipInput = document.getElementById('slip-upload');
+            const hasSlip = slipInput.files.length > 0;
+            let paymentStatusText = hasSlip ? "แนบสลิปแล้ว (รอตรวจสอบ)" : "ยังไม่แนบสลิป (อาจจะจ่ายเงินสด)";
+
+            btn.innerText = "กำลังส่งออเดอร์...";
+            btn.disabled = true;
+
+            const payload = {
+                customerName: customerName,
+                cart: cart,
+                totalAmount: cart.reduce((sum, item) => sum + item.price, 0),
+                paymentMethod: paymentStatusText // ส่งสถานะการจ่ายเงินไปด้วย (ต้องไปแก้ฝั่ง Apps Script นิดหน่อย)
+            };
+
+            fetch(API_URL, {
+                method: 'POST',
+                headers: { "Content-Type": "text/plain;charset=utf-8" },
+                body: JSON.stringify(payload)
+            })
+            .then(response => response.json())
+            .then(result => {
+                if(result.status === "success") {
+                    alert("🎉 สั่งเครื่องดื่มสำเร็จ! คิวของคุณคือ: " + result.orderId + "\n" + paymentStatusText);
+                    cart = [];
+                    updateCartUI();
+                    document.getElementById('paymentModal').style.display = 'none';
+                    document.getElementById('customer-name').value = "";
+                    slipInput.value = ""; // เคลียร์ไฟล์
+                } else {
+                    alert("มีบางอย่างผิดพลาด: " + result.message);
+                }
+            })
+            .catch(error => {
+                alert("เกิดข้อผิดพลาดในการเชื่อมต่อ กรุณาลองใหม่");
+                console.error(error);
+            })
+            .finally(() => {
+                btn.innerText = "ยืนยันการสั่งซื้อ";
+                btn.disabled = false;
+            });
+        }
+    </script>
+</body>
+</html>
