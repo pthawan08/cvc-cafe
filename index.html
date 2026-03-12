@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>CVC Cafe - สั่งเครื่องดื่ม</title>
     <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
     
     <style>
         /* รีเซ็ตค่าเริ่มต้น */
@@ -40,10 +41,12 @@
         /* ตัวเลือกใน Pop-up */
         .option-group { margin-bottom: 20px; }
         .option-title { font-size: 14px; font-weight: 600; color: #34495e; margin-bottom: 10px; }
-        .radio-grid { display: grid; grid-template-columns: 1fr; gap: 8px; }
-        .radio-label { display: flex; align-items: center; padding: 12px 15px; border: 1px solid #e0e0e0; border-radius: 12px; cursor: pointer; font-size: 14px; transition: 0.2s; }
-        .radio-label:has(input:checked) { border-color: #00B900; background-color: #f0fdf0; color: #00B900; font-weight: 500; }
-        .radio-label input { margin-right: 10px; accent-color: #00B900; }
+        .radio-grid, .checkbox-grid { display: grid; grid-template-columns: 1fr; gap: 8px; }
+        
+        /* สไตล์ปุ่มกด ร้อน/เย็น, ความหวาน และท็อปปิ้ง */
+        .radio-label, .checkbox-label { display: flex; align-items: center; padding: 12px 15px; border: 1px solid #e0e0e0; border-radius: 12px; cursor: pointer; font-size: 14px; transition: 0.2s; }
+        .radio-label:has(input:checked), .checkbox-label:has(input:checked) { border-color: #00B900; background-color: #f0fdf0; color: #00B900; font-weight: 500; }
+        .radio-label input, .checkbox-label input { margin-right: 10px; accent-color: #00B900; }
 
         input[type="text"], input[type="file"] { width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 12px; font-size: 15px; font-family: 'Kanit'; outline: none; transition: 0.2s; }
         input[type="text"]:focus { border-color: #00B900; }
@@ -108,6 +111,16 @@
                 </div>
             </div>
 
+            <div class="option-group">
+                <div class="option-title">เพิ่มท็อปปิ้ง / นมทางเลือก (เลือกได้หลายอย่าง) ➕</div>
+                <div class="checkbox-grid">
+                    <label class="checkbox-label"><input type="checkbox" name="addon" value="เพิ่มช็อตกาแฟ" data-price="15"> ☕ เพิ่มช็อตกาแฟ (+15฿)</label>
+                    <label class="checkbox-label"><input type="checkbox" name="addon" value="เปลี่ยนเป็นนมโอ๊ต" data-price="20"> 🌾 เปลี่ยนเป็นนมโอ๊ต (+20฿)</label>
+                    <label class="checkbox-label"><input type="checkbox" name="addon" value="เพิ่มครีมชีส" data-price="20"> 🧀 เพิ่มครีมชีส (+20฿)</label>
+                    <label class="checkbox-label"><input type="checkbox" name="addon" value="เพิ่มวิปครีม" data-price="15"> 🍦 เพิ่มวิปครีม (+15฿)</label>
+                </div>
+            </div>
+
             <button class="btn-full" onclick="addToCart()">+ เพิ่มลงตะกร้า</button>
         </div>
     </div>
@@ -124,6 +137,7 @@
             <div class="option-group">
                 <div class="option-title">ชื่อผู้สั่ง / ชื่อเล่น 👤</div>
                 <input type="text" id="customer-name" placeholder="ระบุชื่อเพื่อให้บาริสต้าเรียกคิว..." required>
+                <small id="liff-status" style="color:#00B900; font-size: 13px; font-weight: 500; display:none; margin-top: 5px;">✓ ดึงชื่อจาก LINE เรียบร้อยแล้ว</small>
             </div>
 
             <button class="btn-full" onclick="openPaymentModal()">ดำเนินการชำระเงิน ➡️</button>
@@ -166,12 +180,34 @@
     </div>
 
     <script>
-        // 🔴🔴🔴 วางลิงก์ URL ที่ได้จาก Apps Script ของคุณที่นี่ 🔴🔴🔴
+        // 🔴 ลิงก์ API ของคุณยังอยู่ครบถ้วนครับ
         const API_URL = "https://script.google.com/macros/s/AKfycbw0urokDyjmhv25KnAeb7JF9OZKW-4e1m3CqDPEtYaq7Z9qDq_e-3XAXOUbtclinf9w/exec";
+        
+        // 🔴 วาง LIFF ID ของคุณตรงนี้นะครับ (เอามาจาก LINE Developers) 🔴
+        const LIFF_ID = "2009434275-8CCxzLOq";
 
         let menuData = []; 
         let currentItem = null; 
         let cart = []; 
+
+        // 🌟 ฟังก์ชันเริ่มต้น LINE LIFF 🌟
+        async function initializeLiff() {
+            try {
+                if(LIFF_ID !== "วาง_LIFF_ID_ที่นี่" && LIFF_ID !== "") {
+                    await liff.init({ liffId: LIFF_ID });
+                    if (liff.isLoggedIn()) {
+                        const profile = await liff.getProfile();
+                        // นำชื่อจาก LINE มาใส่ในช่อง Input อัตโนมัติ
+                        document.getElementById('customer-name').value = profile.displayName;
+                        document.getElementById('liff-status').style.display = 'block';
+                    }
+                }
+            } catch (err) {
+                console.error('LIFF Init Error:', err);
+            }
+        }
+        // สั่งให้ LIFF ทำงานตอนเปิดหน้าเว็บ
+        initializeLiff();
 
         fetch(API_URL)
             .then(response => response.json())
@@ -188,13 +224,11 @@
         function renderMenu() {
             let html = "";
             menuData.forEach(item => {
-                // จัดการราคา
                 let priceText = [];
                 if(item.priceHot) priceText.push(`ร้อน ${item.priceHot}฿`);
                 if(item.priceIce) priceText.push(`เย็น ${item.priceIce}฿`);
                 if(item.priceFrappe) priceText.push(`ปั่น ${item.priceFrappe}฿`);
                 
-                // จัดการรูปภาพ (ถ้าไม่มีรูปลิงก์มา ให้ใช้รูปแก้วกาแฟแบบ Default)
                 let imageUrl = item.image ? item.image : "https://images.unsplash.com/photo-1497935586351-b67a49e012bf?auto=format&fit=crop&q=80&w=200";
 
                 html += `
@@ -223,6 +257,10 @@
             if(currentItem.priceFrappe) typeHtml += `<label class="radio-label"><input type="radio" name="drinkType" value="ปั่น" data-price="${currentItem.priceFrappe}"> แบบปั่น (${currentItem.priceFrappe}฿)</label>`;
             
             document.getElementById('type-options').innerHTML = typeHtml;
+            
+            // เคลียร์ค่าท็อปปิ้งทุกครั้งที่เปิดเมนูใหม่
+            document.querySelectorAll('input[name="addon"]').forEach(cb => cb.checked = false);
+
             document.getElementById('orderModal').style.display = 'flex';
         }
 
@@ -234,12 +272,24 @@
             
             if(!selectedType) { alert("กรุณาเลือกประเภทเครื่องดื่มครับ"); return; }
 
+            // 🌟 คำนวณราคาท็อปปิ้ง และเก็บชื่อท็อปปิ้ง 🌟
+            let addons = [];
+            let addonPrice = 0;
+            document.querySelectorAll('input[name="addon"]:checked').forEach(cb => {
+                addons.push(cb.value);
+                addonPrice += parseInt(cb.getAttribute('data-price'));
+            });
+
+            // สร้าง HTML สำหรับแสดงท็อปปิ้งในตะกร้า
+            let addonText = addons.length > 0 ? `<br><small style="color:#e67e22;">+ ${addons.join(', ')}</small>` : "";
+
             cart.push({
                 id: currentItem.id,
                 name: currentItem.name,
                 type: selectedType.value,
                 sweetness: selectedSweetness,
-                price: parseInt(selectedType.getAttribute('data-price'))
+                addonsHTML: addonText, // เก็บไว้โชว์บนหน้าเว็บ
+                price: parseInt(selectedType.getAttribute('data-price')) + addonPrice // บวกราคาเครื่องดื่ม + ท็อปปิ้ง
             });
 
             closeModal();
@@ -266,7 +316,7 @@
                     <div>
                         <strong>${item.name}</strong> (${item.type})<br>
                         <small style="color:#7f8c8d;">${item.sweetness}</small>
-                    </div>
+                        ${item.addonsHTML} </div>
                     <div style="font-weight:600;">${item.price} ฿</div>
                 </div>`;
             });
@@ -306,9 +356,15 @@
             btn.innerText = "กำลังส่งออเดอร์เข้าครัว... ⏳";
             btn.disabled = true;
 
+            // 🌟 คลีนข้อมูลท็อปปิ้งก่อนส่งไป Google Sheets (ลบ HTML Tag ออก) 🌟
+            let cleanCart = cart.map(item => {
+                let cleanAddon = item.addonsHTML.replace(/<[^>]*>?/gm, ''); // ลบ <br>, <small> ออก
+                return { ...item, sweetness: item.sweetness + " " + cleanAddon } 
+            });
+
             const payload = {
                 customerName: customerName,
-                cart: cart,
+                cart: cleanCart, // ใช้ตะกร้าที่คลีนแล้วส่งไป
                 totalAmount: cart.reduce((sum, item) => sum + item.price, 0),
                 paymentMethod: paymentStatusText
             };
@@ -325,8 +381,15 @@
                     cart = [];
                     updateCartUI();
                     document.getElementById('paymentModal').style.display = 'none';
-                    document.getElementById('customer-name').value = "";
+                    if(!LIFF_ID || LIFF_ID === "วาง_LIFF_ID_ที่นี่") {
+                        document.getElementById('customer-name').value = "";
+                    }
                     slipInput.value = ""; 
+
+                    // 🌟 ถ้าลูกค้าเปิดใน LINE ให้ปิดหน้าต่างเว็บอัตโนมัติ 🌟
+                    if (typeof liff !== 'undefined' && liff.isInClient()) {
+                        liff.closeWindow();
+                    }
                 } else {
                     alert("มีบางอย่างผิดพลาด: " + result.message);
                 }
