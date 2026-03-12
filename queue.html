@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Queue Display - CVC Cafe</title>
+    <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: 'Kanit', sans-serif; background-color: #0f172a; color: #f8fafc; height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+        
+        /* แถบ Header */
+        .header { background: #1e293b; padding: 20px 40px; display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #334155; box-shadow: 0 4px 15px rgba(0,0,0,0.5); z-index: 10; }
+        .header h1 { font-size: 32px; color: #10b981; margin: 0; display: flex; align-items: center; gap: 15px; }
+        .time-display { font-size: 24px; color: #94a3b8; font-weight: 300; }
+
+        /* พื้นที่แสดงคิว แบ่ง 2 ฝั่ง */
+        .board-container { display: flex; flex: 1; padding: 20px; gap: 20px; }
+        
+        /* คอลัมน์ */
+        .column { flex: 1; background: #1e293b; border-radius: 20px; display: flex; flex-direction: column; overflow: hidden; border: 1px solid #334155; box-shadow: 0 10px 25px rgba(0,0,0,0.3); }
+        
+        /* หัวคอลัมน์ */
+        .col-header { padding: 20px; text-align: center; font-size: 28px; font-weight: 700; text-transform: uppercase; letter-spacing: 2px; }
+        .waiting-header { background: #334155; color: #cbd5e1; border-bottom: 4px solid #64748b; }
+        .doing-header { background: #047857; color: #ecfdf5; border-bottom: 4px solid #10b981; }
+
+        /* รายการคิว */
+        .queue-list { padding: 20px; display: flex; flex-direction: column; gap: 15px; overflow-y: auto; flex: 1; }
+        
+        /* การ์ดคิวแต่ละใบ */
+        .q-card { background: #0f172a; border-radius: 12px; padding: 15px 25px; display: flex; justify-content: space-between; align-items: center; border-left: 6px solid; animation: fadeIn 0.5s ease-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        
+        .q-waiting { border-left-color: #64748b; }
+        .q-doing { border-left-color: #10b981; background: #064e3b; } /* สีเด่นขึ้นเมื่อกำลังทำ */
+
+        .q-number { font-size: 40px; font-weight: 700; color: #f8fafc; }
+        .q-doing .q-number { color: #34d399; }
+        
+        .q-name { font-size: 24px; color: #cbd5e1; max-width: 60%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+        /* กรณีไม่มีคิว */
+        .empty-state { text-align: center; color: #475569; font-size: 24px; margin-top: 50px; font-weight: 300; }
+        
+        /* ซ่อน Scrollbar */
+        ::-webkit-scrollbar { width: 0px; }
+    </style>
+</head>
+<body>
+
+    <div class="header">
+        <h1>☕ CVC Cafe <span style="font-size: 20px; color: #64748b; font-weight: 400;">| สถานะคิวเครื่องดื่ม</span></h1>
+        <div class="time-display" id="clock">--:--</div>
+    </div>
+
+    <div class="board-container">
+        <div class="column">
+            <div class="col-header waiting-header">⏳ รอคิว (Waiting)</div>
+            <div class="queue-list" id="waiting-list">
+                <div class="empty-state">กำลังโหลดข้อมูล...</div>
+            </div>
+        </div>
+
+        <div class="column">
+            <div class="col-header doing-header">🔥 กำลังชง (Preparing)</div>
+            <div class="queue-list" id="doing-list">
+                <div class="empty-state">กำลังโหลดข้อมูล...</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 🔴🔴🔴 วางลิงก์ URL ที่ได้จาก Apps Script ของคุณที่นี่ (ลิงก์เดิมเลยครับ) 🔴🔴🔴
+        const API_URL = "https://script.google.com/macros/s/AKfycbw0urokDyjmhv25KnAeb7JF9OZKW-4e1m3CqDPEtYaq7Z9qDq_e-3XAXOUbtclinf9w/exec"; 
+
+        function fetchQueue() {
+            fetch(API_URL + "?action=getOrders")
+                .then(res => res.json())
+                .then(orders => {
+                    renderQueue(orders);
+                })
+                .catch(err => console.error("โหลดคิวไม่สำเร็จ", err));
+        }
+
+        function renderQueue(orders) {
+            const waitingList = document.getElementById('waiting-list');
+            const doingList = document.getElementById('doing-list');
+            
+            let waitingHtml = "";
+            let doingHtml = "";
+
+            orders.forEach(order => {
+                // แยกคิวตามสถานะ (เช็คจากคำว่า "Doing" หรือ "New")
+                if (order.orderStatus.includes("Doing")) {
+                    doingHtml += `
+                    <div class="q-card q-doing">
+                        <div class="q-number">${order.orderId}</div>
+                        <div class="q-name">คุณ ${order.customerName}</div>
+                    </div>`;
+                } else if (order.orderStatus.includes("New")) {
+                    waitingHtml += `
+                    <div class="q-card q-waiting">
+                        <div class="q-number">${order.orderId}</div>
+                        <div class="q-name">คุณ ${order.customerName}</div>
+                    </div>`;
+                }
+            });
+
+            // ใส่ข้อความกรณีไม่มีคิว
+            waitingList.innerHTML = waitingHtml || `<div class="empty-state">ยังไม่มีคิวรอดำเนินการ</div>`;
+            doingList.innerHTML = doingHtml || `<div class="empty-state">บาร์ว่างแล้ว! สั่งได้เลยครับ</div>`;
+        }
+
+        // นาฬิกาขวาบน
+        function updateClock() {
+            const now = new Date();
+            document.getElementById('clock').innerText = 
+                now.getHours().toString().padStart(2, '0') + ":" + 
+                now.getMinutes().toString().padStart(2, '0') + " น.";
+        }
+
+        // โหลดทันทีที่เปิดเว็บ
+        fetchQueue();
+        updateClock();
+
+        // รีเฟรชคิวทุกๆ 10 วินาที
+        setInterval(fetchQueue, 10000);
+        // เดินนาฬิกาทุกๆ 1 นาที
+        setInterval(updateClock, 60000);
+    </script>
+
+</body>
+</html>
