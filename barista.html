@@ -11,7 +11,6 @@
         .header h1 { margin: 0; font-size: 24px; color: #0be881; }
         .order-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 15px; }
         
-        /* สไตล์การ์ด */
         .order-card { background: #2d3436; border-radius: 12px; padding: 15px; border-top: 5px solid #0984e3; box-shadow: 0 4px 6px rgba(0,0,0,0.3); }
         .order-card.doing { border-top-color: #f39c12; }
         .order-card.ready { border-top-color: #0be881; background: #1e3a2f; }
@@ -25,7 +24,6 @@
         .order-details { white-space: pre-line; font-size: 16px; margin: 15px 0; color: #dfe6e9; line-height: 1.5; }
         .payment-status { font-size: 13px; color: #b2bec3; margin-bottom: 15px; }
         
-        /* สไตล์ปุ่ม */
         .btn-group { display: flex; gap: 10px; }
         button { flex: 1; padding: 12px; border: none; border-radius: 8px; font-family: 'Kanit'; font-size: 16px; font-weight: 600; cursor: pointer; transition: 0.2s; }
         .btn-doing { background-color: #f39c12; color: #fff; }
@@ -48,7 +46,7 @@
     <div class="order-grid" id="order-container"></div>
 
     <script>
-        // 🔴 API ของคุณ
+        // 🔴 API ของคุณ (ยังเป็นลิงก์เดิมที่ถูกต้องครับ)
         const API_URL = "https://script.google.com/macros/s/AKfycbx2Tb2F9ePdssiRPvCaWprnsr0kSMIfuoGKSrtjjq61m2hh7RlQ_aXgqImAzG0ScDxN/exec"; 
 
         function fetchOrders() {
@@ -66,23 +64,25 @@
 
         function renderOrders(orders) {
             const container = document.getElementById('order-container');
-            if (orders.length === 0) {
+            
+            // 🌟 แก้ไข: กรองเอาเฉพาะคิวที่ยัง "ไม่ได้รับ" มาแสดง
+            const activeOrders = orders.filter(order => !order.orderStatus.includes("Collected") && !order.orderStatus.includes("รับแล้ว"));
+
+            if (activeOrders.length === 0) {
                 container.innerHTML = "<div style='grid-column: 1/-1; text-align: center; color: #b2bec3; font-size: 20px; padding: 50px;'>🎉 ว่างแล้ว! ยังไม่มีออเดอร์ค้างครับ</div>";
                 return;
             }
 
             let html = "";
-            orders.forEach(order => {
+            activeOrders.forEach(order => {
                 const status = order.orderStatus || "";
                 
-                // 🌟 อัปเกรดการเช็คสถานะให้ดักคำได้กว้างขึ้น ป้องกันบั๊ก
                 const isDoing = status.includes("Doing") || status.includes("กำลังทำ");
                 const isReady = status.includes("Ready") || status.includes("พร้อม") || status.includes("เสร็จ");
 
                 let cardClass = "order-card";
                 let btnHtml = "";
 
-                // เช็คเพื่อแสดงปุ่ม 3 สเตป
                 if (isDoing) {
                     cardClass += " doing";
                     btnHtml = `<button class="btn-ready" onclick="updateStatus(${order.rowNumber}, 'Ready (พร้อมเสิร์ฟ)')">เสร็จแล้ว / เรียกคิว 🔔</button>`;
@@ -90,7 +90,6 @@
                     cardClass += " ready";
                     btnHtml = `<button class="btn-done" onclick="updateStatus(${order.rowNumber}, 'Collected (รับแล้ว)')">ลูกค้ารับเครื่องดื่มแล้ว ✅</button>`;
                 } else {
-                    // ถ้าไม่ใช่ทั้ง Doing และ Ready แปลว่าเป็นคิวใหม่ (New)
                     btnHtml = `<button class="btn-doing" onclick="updateStatus(${order.rowNumber}, 'Doing (กำลังทำ)')">กำลังทำ ⏳</button>`;
                 }
                 
@@ -110,7 +109,6 @@
         }
 
         function updateStatus(rowNumber, newStatus) {
-            // เปลี่ยนข้อความปุ่มระหว่างรอโหลด
             event.target.innerText = "กำลังอัปเดต..."; 
             event.target.disabled = true;
             
@@ -121,7 +119,7 @@
             .then(res => res.json())
             .then(result => { 
                 if(result.status === "success") {
-                    fetchOrders(); // อัปเดตเสร็จให้ดึงข้อมูลใหม่ทันที
+                    fetchOrders(); 
                 } else {
                     alert("อัปเดตไม่สำเร็จ กรุณาลองใหม่");
                 }
@@ -132,7 +130,6 @@
             });
         }
         
-        // รันครั้งแรก และตั้งเวลารีเฟรชทุก 10 วินาที
         fetchOrders(); 
         setInterval(fetchOrders, 10000);
     </script>
