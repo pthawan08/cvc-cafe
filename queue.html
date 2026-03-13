@@ -21,7 +21,7 @@
         @keyframes pulse { 0% { background: #10b981; } 50% { background: #059669; } 100% { background: #10b981; } }
 
         .queue-list { padding: 20px; display: flex; flex-direction: column; gap: 15px; overflow-y: auto; flex: 1; }
-        .q-card { background: #0f172a; border-radius: 12px; padding: 20px 25px; display: flex; justify-content: space-between; align-items: center; border-left: 8px solid; animation: fadeIn 0.5s ease-out; }
+        .q-card { background: #0f172a; border-radius: 12px; padding: 20px 25px; display: flex; justify-content: space-between; align-items: center; border-left: 8px solid; animation: fadeIn 0.5s ease-out; transition: all 0.5s; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
         
         .q-preparing { border-left-color: #f59e0b; }
@@ -58,24 +58,58 @@
     </div>
 
     <script>
-        // 🔴 วาง URL ของ Apps Script ที่นี่
+        // 🔴 API ของคุณ (ใส่ให้แล้ว)
         const API_URL = "https://script.google.com/macros/s/AKfycbx2Tb2F9ePdssiRPvCaWprnsr0kSMIfuoGKSrtjjq61m2hh7RlQ_aXgqImAzG0ScDxN/exec"; 
 
+        // 🌟 ตัวแปรเก็บเวลาของคิวที่เสร็จแล้ว (เพื่อเอาไว้จับเวลา 1 นาที)
+        let readyTimestamps = {};
+        const AUTO_HIDE_MS = 60000; // 60,000 มิลลิวินาที = 1 นาที
+
         function fetchQueue() {
-            fetch(API_URL + "?action=getOrders").then(res => res.json()).then(orders => renderQueue(orders));
+            fetch(API_URL + "?action=getOrders")
+                .then(res => res.json())
+                .then(orders => renderQueue(orders))
+                .catch(err => console.error("Error fetching queue:", err));
         }
 
         function renderQueue(orders) {
             const preparingList = document.getElementById('preparing-list');
             const readyList = document.getElementById('ready-list');
-            let prepHtml = "", readyHtml = "";
+            let prepHtml = "";
+            let readyHtml = "";
+
+            let currentOrderIds = [];
 
             orders.forEach(order => {
-                if (order.orderStatus.includes("Ready") || order.orderStatus.includes("เสร็จแล้ว")) {
-                    readyHtml += `<div class="q-card q-ready"><div class="q-number">${order.orderId}</div><div class="q-name">คุณ ${order.customerName}</div></div>`;
-                } else {
+                currentOrderIds.push(order.orderId);
+                const status = order.orderStatus || "";
+                
+                // ถ้าระบุว่าเสร็จแล้ว หรือ พร้อมเสิร์ฟ
+                if (status.includes("Ready") || status.includes("เสร็จ") || status.includes("พร้อม")) {
+                    
+                    // ถ้ารหัสคิวนี้เพิ่งเคยเข้ามาฝั่งขวาครั้งแรก ให้จดเวลาปัจจุบันไว้
+                    if (!readyTimestamps[order.orderId]) {
+                        readyTimestamps[order.orderId] = Date.now();
+                    }
+
+                    // คำนวณเวลาที่ผ่านไปว่าเกิน 1 นาทีหรือยัง
+                    const timePassed = Date.now() - readyTimestamps[order.orderId];
+                    
+                    // 🌟 ถ้าเวลายังไม่เกิน 1 นาที ถึงจะโชว์บนหน้าจอทีวี
+                    if (timePassed <= AUTO_HIDE_MS) {
+                        readyHtml += `<div class="q-card q-ready"><div class="q-number">${order.orderId}</div><div class="q-name">คุณ ${order.customerName}</div></div>`;
+                    }
+
+                } 
+                // ถ้ายังทำไม่เสร็จ (กำลังทำ หรือ รอคิว)
+                else if (!status.includes("Collected") && !status.includes("รับแล้ว")) {
                     prepHtml += `<div class="q-card q-preparing"><div class="q-number">${order.orderId}</div><div class="q-name">คุณ ${order.customerName}</div></div>`;
                 }
+            });
+
+            // ล้างความจำคิวเก่าๆ ที่หายไปจากระบบแล้ว
+            Object.keys(readyTimestamps).forEach(id => {
+                if (!currentOrderIds.includes(id)) delete readyTimestamps[id];
             });
 
             preparingList.innerHTML = prepHtml || `<div class="empty-state">ยังไม่มีคิวที่กำลังชงครับ</div>`;
@@ -83,9 +117,15 @@
         }
 
         function updateClock() {
-            const now = new Date(); document.getElementById('clock').innerText = now.getHours().toString().padStart(2, '0') + ":" + now.getMinutes().toString().padStart(2, '0') + " น.";
+            const now = new Date(); 
+            document.getElementById('clock').innerText = now.getHours().toString().padStart(2, '0') + ":" + now.getMinutes().toString().padStart(2, '0') + " น.";
         }
-        fetchQueue(); updateClock(); setInterval(fetchQueue, 5000); setInterval(updateClock, 60000);
+        
+        // รันครั้งแรก และตั้งเวลาให้ดึงข้อมูลใหม่ทุกๆ 5 วินาที
+        fetchQueue(); 
+        updateClock(); 
+        setInterval(fetchQueue, 5000); 
+        setInterval(updateClock, 60000);
     </script>
 </body>
 </html>
