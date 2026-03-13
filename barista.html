@@ -9,32 +9,26 @@
         body { font-family: 'Kanit', sans-serif; background-color: #1e272e; color: #fff; margin: 0; padding: 20px; }
         .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; padding-bottom: 10px; border-bottom: 1px solid #485460; }
         .header h1 { margin: 0; font-size: 24px; color: #0be881; }
-        
-        /* Grid สำหรับจัดเรียงการ์ดออเดอร์ */
         .order-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 15px; }
-        
         .order-card { background: #2d3436; border-radius: 12px; padding: 15px; border-top: 5px solid #0984e3; box-shadow: 0 4px 6px rgba(0,0,0,0.3); }
         .order-card.doing { border-top-color: #f39c12; }
-        
+        .order-card.ready { border-top-color: #0be881; background: #1e3a2f; }
         .order-header { display: flex; justify-content: space-between; margin-bottom: 10px; border-bottom: 1px dashed #636e72; padding-bottom: 5px;}
         .queue-num { font-size: 20px; font-weight: bold; color: #0984e3; }
         .order-card.doing .queue-num { color: #f39c12; }
-        
+        .order-card.ready .queue-num { color: #0be881; }
         .customer-name { font-size: 18px; font-weight: 500; }
         .order-details { white-space: pre-line; font-size: 16px; margin: 15px 0; color: #dfe6e9; line-height: 1.5; }
         .payment-status { font-size: 13px; color: #b2bec3; margin-bottom: 15px; }
-        
         .btn-group { display: flex; gap: 10px; }
         button { flex: 1; padding: 12px; border: none; border-radius: 8px; font-family: 'Kanit'; font-size: 16px; font-weight: 600; cursor: pointer; transition: 0.2s; }
-        
         .btn-doing { background-color: #f39c12; color: #fff; }
-        .btn-done { background-color: #0be881; color: #1e272e; }
-        
+        .btn-ready { background-color: #0be881; color: #1e272e; }
+        .btn-done { background-color: #636e72; color: #fff; }
         #loading { text-align: center; color: #b2bec3; margin-top: 50px; font-size: 18px; }
     </style>
 </head>
 <body>
-
     <div class="header">
         <h1>☕ จอบาริสต้า (Barista Station)</h1>
         <div>
@@ -42,98 +36,67 @@
             <button onclick="fetchOrders()" style="flex:none; padding: 8px 15px; background: #485460; color: white;">🔄 รีเฟรชคิว</button>
         </div>
     </div>
-
     <div id="loading">กำลังดึงข้อมูลคิว...</div>
     <div class="order-grid" id="order-container"></div>
 
     <script>
-        // 🔴🔴🔴 วางลิงก์ URL ที่ได้จาก Apps Script ของคุณที่นี่ (ลิงก์เดียวกับหน้าลูกค้าเลยครับ) 🔴🔴🔴
+        // 🔴 วาง URL ของ Apps Script ที่นี่
         const API_URL = "https://script.google.com/macros/s/AKfycbw9038zk-erMHJxthm0PLiSao90n_34ByHNzPBmiP9rmSWotjdaLlrIPDzu1Su0aH-i/exec"; 
 
         function fetchOrders() {
-            document.getElementById('last-update').innerText = "อัปเดตล่าสุด: กำลังรีเฟรช...";
-            
-            // ดึงข้อมูลโดยส่ง parameter action=getOrders ไปด้วย
+            document.getElementById('last-update').innerText = "กำลังรีเฟรช...";
             fetch(API_URL + "?action=getOrders")
                 .then(res => res.json())
                 .then(data => {
                     document.getElementById('loading').style.display = 'none';
                     renderOrders(data);
-                    
                     const now = new Date();
                     document.getElementById('last-update').innerText = `อัปเดตล่าสุด: ${now.getHours().toString().padStart(2,'0')}:${now.getMinutes().toString().padStart(2,'0')} น.`;
-                })
-                .catch(err => {
-                    document.getElementById('last-update').innerText = "❌ อัปเดตล้มเหลว ลองรีเฟรชใหม่";
-                    console.error(err);
                 });
         }
 
         function renderOrders(orders) {
             const container = document.getElementById('order-container');
             if (orders.length === 0) {
-                container.innerHTML = "<div style='grid-column: 1/-1; text-align: center; color: #b2bec3; font-size: 20px; padding: 50px;'>🎉 ว่างแล้ว! ยังไม่มีออเดอร์ใหม่เข้ามาครับ</div>";
+                container.innerHTML = "<div style='grid-column: 1/-1; text-align: center; color: #b2bec3; font-size: 20px; padding: 50px;'>🎉 ว่างแล้ว! ยังไม่มีออเดอร์ค้างครับ</div>";
                 return;
             }
 
             let html = "";
             orders.forEach(order => {
                 const isDoing = order.orderStatus.includes("Doing");
-                const cardClass = isDoing ? "order-card doing" : "order-card";
+                const isReady = order.orderStatus.includes("Ready");
+                let cardClass = "order-card";
+                if (isDoing) cardClass += " doing";
+                if (isReady) cardClass += " ready";
+
+                let btnHtml = "";
+                if (!isDoing && !isReady) {
+                    btnHtml = `<button class="btn-doing" onclick="updateStatus(${order.rowNumber}, 'Doing (กำลังทำ)')">กำลังทำ ⏳</button>`;
+                } else if (isDoing) {
+                    btnHtml = `<button class="btn-ready" onclick="updateStatus(${order.rowNumber}, 'Ready (พร้อมเสิร์ฟ)')">เสร็จแล้ว / เรียกคิว 🔔</button>`;
+                } else if (isReady) {
+                    btnHtml = `<button class="btn-done" onclick="updateStatus(${order.rowNumber}, 'Collected (รับแล้ว)')">ลูกค้ารับเครื่องดื่มแล้ว ✅</button>`;
+                }
                 
                 html += `
                 <div class="${cardClass}">
-                    <div class="order-header">
-                        <span class="queue-num">${order.orderId}</span>
-                        <span style="color:#b2bec3; font-size:14px;">เวลา: ${order.time}</span>
-                    </div>
+                    <div class="order-header"><span class="queue-num">${order.orderId}</span><span style="color:#b2bec3; font-size:14px;">${order.time}</span></div>
                     <div class="customer-name">👤 ${order.customerName}</div>
-                    
                     <div class="order-details">${order.orderDetails}</div>
-                    
                     <div class="payment-status">💸 ${order.paymentMethod}</div>
-                    
-                    <div class="btn-group">
-                        ${!isDoing ? `<button class="btn-doing" onclick="updateStatus(${order.rowNumber}, 'Doing (กำลังทำ)')">กำลังทำ ⏳</button>` : ''}
-                        <button class="btn-done" onclick="updateStatus(${order.rowNumber}, 'Done (เสร็จแล้ว)')">เสร็จแล้ว ✅</button>
-                    </div>
+                    <div class="btn-group">${btnHtml}</div>
                 </div>`;
             });
             container.innerHTML = html;
         }
 
         function updateStatus(rowNumber, newStatus) {
-            const payload = {
-                action: "updateStatus",
-                rowNumber: rowNumber,
-                newStatus: newStatus
-            };
-
-            // เปลี่ยนปุ่มเป็นสถานะโหลด
-            event.target.innerText = "กำลังอัปเดต...";
-            event.target.disabled = true;
-
-            fetch(API_URL, {
-                method: 'POST',
-                headers: { "Content-Type": "text/plain;charset=utf-8" },
-                body: JSON.stringify(payload)
-            })
-            .then(res => res.json())
-            .then(result => {
-                if(result.status === "success") {
-                    fetchOrders(); // ดึงข้อมูลใหม่เพื่อรีเฟรชหน้าจอ
-                } else {
-                    alert("เกิดข้อผิดพลาด: " + result.message);
-                }
-            })
-            .catch(err => alert("ขัดข้อง กรุณาลองใหม่"));
+            event.target.innerText = "กำลังอัปเดต..."; event.target.disabled = true;
+            fetch(API_URL, { method: 'POST', body: JSON.stringify({ action: "updateStatus", rowNumber: rowNumber, newStatus: newStatus }) })
+            .then(res => res.json()).then(result => { if(result.status === "success") fetchOrders(); });
         }
-
-        // โหลดข้อมูลครั้งแรกเมื่อเปิดหน้าเว็บ
-        fetchOrders();
-
-        // 🌟 ตั้งเวลาให้รีเฟรชคิวอัตโนมัติ ทุกๆ 15 วินาที
-        setInterval(fetchOrders, 15000);
+        fetchOrders(); setInterval(fetchOrders, 10000);
     </script>
 </body>
 </html>
