@@ -8,127 +8,84 @@
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body { font-family: 'Kanit', sans-serif; background-color: #0f172a; color: #f8fafc; height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
-        
-        /* แถบ Header */
         .header { background: #1e293b; padding: 20px 40px; display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #334155; box-shadow: 0 4px 15px rgba(0,0,0,0.5); z-index: 10; }
-        .header h1 { font-size: 32px; color: #10b981; margin: 0; display: flex; align-items: center; gap: 15px; }
+        .header h1 { font-size: 32px; color: #10b981; margin: 0; }
         .time-display { font-size: 24px; color: #94a3b8; font-weight: 300; }
-
-        /* พื้นที่แสดงคิว แบ่ง 2 ฝั่ง */
         .board-container { display: flex; flex: 1; padding: 20px; gap: 20px; }
-        
-        /* คอลัมน์ */
         .column { flex: 1; background: #1e293b; border-radius: 20px; display: flex; flex-direction: column; overflow: hidden; border: 1px solid #334155; box-shadow: 0 10px 25px rgba(0,0,0,0.3); }
+        .col-header { padding: 20px; text-align: center; font-size: 32px; font-weight: 700; text-transform: uppercase; }
         
-        /* หัวคอลัมน์ */
-        .col-header { padding: 20px; text-align: center; font-size: 28px; font-weight: 700; text-transform: uppercase; letter-spacing: 2px; }
         .waiting-header { background: #334155; color: #cbd5e1; border-bottom: 4px solid #64748b; }
-        .doing-header { background: #047857; color: #ecfdf5; border-bottom: 4px solid #10b981; }
-
-        /* รายการคิว */
-        .queue-list { padding: 20px; display: flex; flex-direction: column; gap: 15px; overflow-y: auto; flex: 1; }
+        .ready-header { background: #10b981; color: #fff; border-bottom: 4px solid #047857; animation: pulse 2s infinite; }
         
-        /* การ์ดคิวแต่ละใบ */
-        .q-card { background: #0f172a; border-radius: 12px; padding: 15px 25px; display: flex; justify-content: space-between; align-items: center; border-left: 6px solid; animation: fadeIn 0.5s ease-out; }
+        @keyframes pulse { 0% { background: #10b981; } 50% { background: #059669; } 100% { background: #10b981; } }
+
+        .queue-list { padding: 20px; display: flex; flex-direction: column; gap: 15px; overflow-y: auto; flex: 1; }
+        .q-card { background: #0f172a; border-radius: 12px; padding: 20px 25px; display: flex; justify-content: space-between; align-items: center; border-left: 8px solid; animation: fadeIn 0.5s ease-out; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
         
-        .q-waiting { border-left-color: #64748b; }
-        .q-doing { border-left-color: #10b981; background: #064e3b; } /* สีเด่นขึ้นเมื่อกำลังทำ */
+        .q-preparing { border-left-color: #f59e0b; }
+        .q-ready { border-left-color: #10b981; background: #064e3b; box-shadow: 0 0 15px rgba(16, 185, 129, 0.4); }
 
-        .q-number { font-size: 40px; font-weight: 700; color: #f8fafc; }
-        .q-doing .q-number { color: #34d399; }
-        
-        .q-name { font-size: 24px; color: #cbd5e1; max-width: 60%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-
-        /* กรณีไม่มีคิว */
+        .q-number { font-size: 45px; font-weight: 700; color: #f8fafc; }
+        .q-ready .q-number { color: #34d399; }
+        .q-name { font-size: 26px; color: #cbd5e1; max-width: 60%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .empty-state { text-align: center; color: #475569; font-size: 24px; margin-top: 50px; font-weight: 300; }
         
-        /* ซ่อน Scrollbar */
-        ::-webkit-scrollbar { width: 0px; }
+        /* มือถือแนวตั้ง */
+        @media (max-width: 768px) {
+            .board-container { flex-direction: column; padding: 10px; }
+            .header { padding: 15px 20px; } .header h1 { font-size: 22px; } .time-display { font-size: 18px; }
+            .column { min-height: 300px; } .col-header { font-size: 24px; padding: 15px; }
+            .q-number { font-size: 35px; } .q-name { font-size: 20px; }
+        }
     </style>
 </head>
 <body>
-
     <div class="header">
-        <h1>☕ CVC Cafe <span style="font-size: 20px; color: #64748b; font-weight: 400;">| สถานะคิวเครื่องดื่ม</span></h1>
+        <h1>☕ CVC Cafe | สถานะคิว</h1>
         <div class="time-display" id="clock">--:--</div>
     </div>
-
     <div class="board-container">
         <div class="column">
-            <div class="col-header waiting-header">⏳ รอคิว (Waiting)</div>
-            <div class="queue-list" id="waiting-list">
-                <div class="empty-state">กำลังโหลดข้อมูล...</div>
-            </div>
+            <div class="col-header waiting-header">⏳ กำลังเตรียม (Preparing)</div>
+            <div class="queue-list" id="preparing-list"></div>
         </div>
-
         <div class="column">
-            <div class="col-header doing-header">🔥 กำลังชง (Preparing)</div>
-            <div class="queue-list" id="doing-list">
-                <div class="empty-state">กำลังโหลดข้อมูล...</div>
-            </div>
+            <div class="col-header ready-header">🔔 เชิญรับเครื่องดื่ม (Ready)</div>
+            <div class="queue-list" id="ready-list"></div>
         </div>
     </div>
 
     <script>
-        // 🔴🔴🔴 วางลิงก์ URL ที่ได้จาก Apps Script ของคุณที่นี่ (ลิงก์เดิมเลยครับ) 🔴🔴🔴
+        // 🔴 วาง URL ของ Apps Script ที่นี่
         const API_URL = "https://script.google.com/macros/s/AKfycbw9038zk-erMHJxthm0PLiSao90n_34ByHNzPBmiP9rmSWotjdaLlrIPDzu1Su0aH-i/exec"; 
 
         function fetchQueue() {
-            fetch(API_URL + "?action=getOrders")
-                .then(res => res.json())
-                .then(orders => {
-                    renderQueue(orders);
-                })
-                .catch(err => console.error("โหลดคิวไม่สำเร็จ", err));
+            fetch(API_URL + "?action=getOrders").then(res => res.json()).then(orders => renderQueue(orders));
         }
 
         function renderQueue(orders) {
-            const waitingList = document.getElementById('waiting-list');
-            const doingList = document.getElementById('doing-list');
-            
-            let waitingHtml = "";
-            let doingHtml = "";
+            const preparingList = document.getElementById('preparing-list');
+            const readyList = document.getElementById('ready-list');
+            let prepHtml = "", readyHtml = "";
 
             orders.forEach(order => {
-                // แยกคิวตามสถานะ (เช็คจากคำว่า "Doing" หรือ "New")
-                if (order.orderStatus.includes("Doing")) {
-                    doingHtml += `
-                    <div class="q-card q-doing">
-                        <div class="q-number">${order.orderId}</div>
-                        <div class="q-name">คุณ ${order.customerName}</div>
-                    </div>`;
-                } else if (order.orderStatus.includes("New")) {
-                    waitingHtml += `
-                    <div class="q-card q-waiting">
-                        <div class="q-number">${order.orderId}</div>
-                        <div class="q-name">คุณ ${order.customerName}</div>
-                    </div>`;
+                if (order.orderStatus.includes("Ready") || order.orderStatus.includes("เสร็จแล้ว")) {
+                    readyHtml += `<div class="q-card q-ready"><div class="q-number">${order.orderId}</div><div class="q-name">คุณ ${order.customerName}</div></div>`;
+                } else {
+                    prepHtml += `<div class="q-card q-preparing"><div class="q-number">${order.orderId}</div><div class="q-name">คุณ ${order.customerName}</div></div>`;
                 }
             });
 
-            // ใส่ข้อความกรณีไม่มีคิว
-            waitingList.innerHTML = waitingHtml || `<div class="empty-state">ยังไม่มีคิวรอดำเนินการ</div>`;
-            doingList.innerHTML = doingHtml || `<div class="empty-state">บาร์ว่างแล้ว! สั่งได้เลยครับ</div>`;
+            preparingList.innerHTML = prepHtml || `<div class="empty-state">ยังไม่มีคิวที่กำลังชงครับ</div>`;
+            readyList.innerHTML = readyHtml || `<div class="empty-state">กรุณารอสักครู่นะครับ ☺️</div>`;
         }
 
-        // นาฬิกาขวาบน
         function updateClock() {
-            const now = new Date();
-            document.getElementById('clock').innerText = 
-                now.getHours().toString().padStart(2, '0') + ":" + 
-                now.getMinutes().toString().padStart(2, '0') + " น.";
+            const now = new Date(); document.getElementById('clock').innerText = now.getHours().toString().padStart(2, '0') + ":" + now.getMinutes().toString().padStart(2, '0') + " น.";
         }
-
-        // โหลดทันทีที่เปิดเว็บ
-        fetchQueue();
-        updateClock();
-
-        // รีเฟรชคิวทุกๆ 10 วินาที
-        setInterval(fetchQueue, 10000);
-        // เดินนาฬิกาทุกๆ 1 นาที
-        setInterval(updateClock, 60000);
+        fetchQueue(); updateClock(); setInterval(fetchQueue, 5000); setInterval(updateClock, 60000);
     </script>
-
 </body>
 </html>
