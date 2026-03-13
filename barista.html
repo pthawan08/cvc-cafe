@@ -10,21 +10,28 @@
         .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; padding-bottom: 10px; border-bottom: 1px solid #485460; }
         .header h1 { margin: 0; font-size: 24px; color: #0be881; }
         .order-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 15px; }
+        
+        /* สไตล์การ์ด */
         .order-card { background: #2d3436; border-radius: 12px; padding: 15px; border-top: 5px solid #0984e3; box-shadow: 0 4px 6px rgba(0,0,0,0.3); }
         .order-card.doing { border-top-color: #f39c12; }
         .order-card.ready { border-top-color: #0be881; background: #1e3a2f; }
+        
         .order-header { display: flex; justify-content: space-between; margin-bottom: 10px; border-bottom: 1px dashed #636e72; padding-bottom: 5px;}
         .queue-num { font-size: 20px; font-weight: bold; color: #0984e3; }
         .order-card.doing .queue-num { color: #f39c12; }
         .order-card.ready .queue-num { color: #0be881; }
+        
         .customer-name { font-size: 18px; font-weight: 500; }
         .order-details { white-space: pre-line; font-size: 16px; margin: 15px 0; color: #dfe6e9; line-height: 1.5; }
         .payment-status { font-size: 13px; color: #b2bec3; margin-bottom: 15px; }
+        
+        /* สไตล์ปุ่ม */
         .btn-group { display: flex; gap: 10px; }
         button { flex: 1; padding: 12px; border: none; border-radius: 8px; font-family: 'Kanit'; font-size: 16px; font-weight: 600; cursor: pointer; transition: 0.2s; }
         .btn-doing { background-color: #f39c12; color: #fff; }
         .btn-ready { background-color: #0be881; color: #1e272e; }
         .btn-done { background-color: #636e72; color: #fff; }
+        
         #loading { text-align: center; color: #b2bec3; margin-top: 50px; font-size: 18px; }
     </style>
 </head>
@@ -36,11 +43,12 @@
             <button onclick="fetchOrders()" style="flex:none; padding: 8px 15px; background: #485460; color: white;">🔄 รีเฟรชคิว</button>
         </div>
     </div>
+    
     <div id="loading">กำลังดึงข้อมูลคิว...</div>
     <div class="order-grid" id="order-container"></div>
 
     <script>
-        // 🔴 วาง URL ของ Apps Script ที่นี่
+        // 🔴 API ของคุณ
         const API_URL = "https://script.google.com/macros/s/AKfycbw9038zk-erMHJxthm0PLiSao90n_34ByHNzPBmiP9rmSWotjdaLlrIPDzu1Su0aH-i/exec"; 
 
         function fetchOrders() {
@@ -52,7 +60,8 @@
                     renderOrders(data);
                     const now = new Date();
                     document.getElementById('last-update').innerText = `อัปเดตล่าสุด: ${now.getHours().toString().padStart(2,'0')}:${now.getMinutes().toString().padStart(2,'0')} น.`;
-                });
+                })
+                .catch(err => console.error("Error fetching orders:", err));
         }
 
         function renderOrders(orders) {
@@ -64,24 +73,33 @@
 
             let html = "";
             orders.forEach(order => {
-                const isDoing = order.orderStatus.includes("Doing");
-                const isReady = order.orderStatus.includes("Ready");
-                let cardClass = "order-card";
-                if (isDoing) cardClass += " doing";
-                if (isReady) cardClass += " ready";
+                const status = order.orderStatus || "";
+                
+                // 🌟 อัปเกรดการเช็คสถานะให้ดักคำได้กว้างขึ้น ป้องกันบั๊ก
+                const isDoing = status.includes("Doing") || status.includes("กำลังทำ");
+                const isReady = status.includes("Ready") || status.includes("พร้อม") || status.includes("เสร็จ");
 
+                let cardClass = "order-card";
                 let btnHtml = "";
-                if (!isDoing && !isReady) {
-                    btnHtml = `<button class="btn-doing" onclick="updateStatus(${order.rowNumber}, 'Doing (กำลังทำ)')">กำลังทำ ⏳</button>`;
-                } else if (isDoing) {
+
+                // เช็คเพื่อแสดงปุ่ม 3 สเตป
+                if (isDoing) {
+                    cardClass += " doing";
                     btnHtml = `<button class="btn-ready" onclick="updateStatus(${order.rowNumber}, 'Ready (พร้อมเสิร์ฟ)')">เสร็จแล้ว / เรียกคิว 🔔</button>`;
                 } else if (isReady) {
+                    cardClass += " ready";
                     btnHtml = `<button class="btn-done" onclick="updateStatus(${order.rowNumber}, 'Collected (รับแล้ว)')">ลูกค้ารับเครื่องดื่มแล้ว ✅</button>`;
+                } else {
+                    // ถ้าไม่ใช่ทั้ง Doing และ Ready แปลว่าเป็นคิวใหม่ (New)
+                    btnHtml = `<button class="btn-doing" onclick="updateStatus(${order.rowNumber}, 'Doing (กำลังทำ)')">กำลังทำ ⏳</button>`;
                 }
                 
                 html += `
                 <div class="${cardClass}">
-                    <div class="order-header"><span class="queue-num">${order.orderId}</span><span style="color:#b2bec3; font-size:14px;">${order.time}</span></div>
+                    <div class="order-header">
+                        <span class="queue-num">${order.orderId}</span>
+                        <span style="color:#b2bec3; font-size:14px;">${order.time}</span>
+                    </div>
                     <div class="customer-name">👤 ${order.customerName}</div>
                     <div class="order-details">${order.orderDetails}</div>
                     <div class="payment-status">💸 ${order.paymentMethod}</div>
@@ -92,11 +110,31 @@
         }
 
         function updateStatus(rowNumber, newStatus) {
-            event.target.innerText = "กำลังอัปเดต..."; event.target.disabled = true;
-            fetch(API_URL, { method: 'POST', body: JSON.stringify({ action: "updateStatus", rowNumber: rowNumber, newStatus: newStatus }) })
-            .then(res => res.json()).then(result => { if(result.status === "success") fetchOrders(); });
+            // เปลี่ยนข้อความปุ่มระหว่างรอโหลด
+            event.target.innerText = "กำลังอัปเดต..."; 
+            event.target.disabled = true;
+            
+            fetch(API_URL, { 
+                method: 'POST', 
+                body: JSON.stringify({ action: "updateStatus", rowNumber: rowNumber, newStatus: newStatus }) 
+            })
+            .then(res => res.json())
+            .then(result => { 
+                if(result.status === "success") {
+                    fetchOrders(); // อัปเดตเสร็จให้ดึงข้อมูลใหม่ทันที
+                } else {
+                    alert("อัปเดตไม่สำเร็จ กรุณาลองใหม่");
+                }
+            })
+            .catch(err => {
+                alert("เกิดข้อผิดพลาดในการเชื่อมต่อ");
+                console.error(err);
+            });
         }
-        fetchOrders(); setInterval(fetchOrders, 10000);
+        
+        // รันครั้งแรก และตั้งเวลารีเฟรชทุก 10 วินาที
+        fetchOrders(); 
+        setInterval(fetchOrders, 10000);
     </script>
 </body>
 </html>
